@@ -4,7 +4,7 @@ const fs = require('fs');
 var ImageKit = require("imagekit");
 const moment = require('moment');
 const connection = require("../connection/db");
-const IMGKIT_API_KEY = process.env.PUBLIC_KEY;
+const IMGKIT_API_KEY = "public_Dxc7A/F93rZhtobT9hWTmjftTEI="
 const IMGKIT_API_ENDPOINT = process.env.PUBLIC_KEY_SECRET;
 const path = require('path');
 const crypto = require('crypto');
@@ -16,6 +16,10 @@ var imagekit = new ImageKit({
     privateKey: IMGKIT_API_ENDPOINT,
     urlEndpoint: "https://ik.imagekit.io/9onnlplci"
 });
+
+console.log("Public Key:", IMGKIT_API_KEY)
+
+
 
 const GMBController = {
 
