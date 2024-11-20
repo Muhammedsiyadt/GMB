@@ -5,7 +5,7 @@ var ImageKit = require("imagekit");
 const moment = require('moment');
 const connection = require("../connection/db");
 const IMGKIT_API_KEY = "public_Dxc7A/F93rZhtobT9hWTmjftTEI="
-const IMGKIT_API_ENDPOINT = process.env.PUBLIC_KEY_SECRET;
+const IMGKIT_API_ENDPOINT = "private_nYz4ss23qRkhOzxCHE1mvjtGKIk="
 const path = require('path');
 const crypto = require('crypto');
 const cron = require('node-cron');
@@ -17,7 +17,6 @@ var imagekit = new ImageKit({
     urlEndpoint: "https://ik.imagekit.io/9onnlplci"
 });
 
-console.log("Public Key:", IMGKIT_API_KEY)
 
 
 
