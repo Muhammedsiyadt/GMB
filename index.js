@@ -31,8 +31,6 @@ app.get('/', (req, res) => {
 
 cron.schedule('*/10 * * * * *', async () => {
     try {
-
-        // console.log('Crone checking every 10 seconds...')
         
         const [posts] = await connection.query('SELECT * FROM scheduleposts WHERE status = "pending"');
 
@@ -56,15 +54,15 @@ cron.schedule('*/10 * * * * *', async () => {
                         },
                     ], 
                 };  
-                
+                 
   
                  
                 try {
-                    const response = await axios.post( 
+                    const response = await axios.post(  
                         `https://mybusiness.googleapis.com/v4/${account}/${location_id}/localPosts`,
                         postBody,
                         {
-                            headers: {
+                            headers: { 
                                 Authorization: `Bearer ${accessToken}`,
                             },
                         }
