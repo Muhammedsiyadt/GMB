@@ -696,7 +696,7 @@ const GMBController = {
 
             // Process each keyword
             for (const keyword of keywords) {
-                console.log(`Updating rank for keyword: ${keyword.keyword}`);
+                // console.log(`Updating rank for keyword: ${keyword.keyword}`);
             }
 
             return res.json({ success: true, message: 'Keyword rank updated successfully' });
@@ -800,6 +800,7 @@ const GMBController = {
 
     getAllViewers: async (req, res) => {
         const { id } = req.params;
+
         const gmbAccessToken = req.headers['gmb-access-token'];
 
         if (!gmbAccessToken) {
@@ -816,7 +817,8 @@ const GMBController = {
                 },
             });
 
-            // console.log(response.data.multiDailyMetricTimeSeries[0].dailyMetricTimeSeries)
+
+            // console.log(response.data.multiDailyMetricTimeSeries[0].dailyMetricTimeSeries[0].timeSeries.datedValues.length)
 
             return res.status(200).json(response.data);
 
@@ -834,6 +836,64 @@ const GMBController = {
             });
         }
     },
+
+    getlocationData: async (req, res) => {
+        const { locationId } = req.params; 
+        const gmbAccessToken = req.headers['gmb_access_token'];
+        
+        if (!locationId) {
+            return res.status(400).json({ error: 'Location ID is required' });
+        }
+        if (!gmbAccessToken) {
+            return res.status(401).json({ error: 'Missing Authorization tokens' });
+        }
+    
+        // Object to store the latest location data
+        let locationData = {};
+    
+        const api = `https://mybusinessbusinessinformation.googleapis.com/v1/locations/${locationId}?readMask=title`;
+        
+        try {
+            const response = await axios.get(api, {
+                headers: {
+                    Authorization: `Bearer ${gmbAccessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+    
+            // Assuming title is available in response.data.title
+            const title = response.data.title;
+    
+            // Store the current location and name in the object
+            locationData = {
+                location: locationId,
+                name: title
+            };
+    
+            res.status(200).json({
+                success: true,
+                data: locationData
+            });
+    
+        } catch (error) {
+            console.error('Error fetching location data:', error);
+    
+            // Handle specific error responses
+            if (error.response) {
+                res.status(error.response.status).json({
+                    success: false,
+                    message: error.response.data.error.message,
+                    details: error.response.data.error.details || null
+                });
+            } else {
+                res.status(500).json({
+                    success: false,
+                    message: 'Internal Server Error'
+                });
+            }
+        }
+    }
+    ,
 
     getAllReviews: async (req, res) => {
         try {
@@ -1165,7 +1225,168 @@ const GMBController = {
                 details: error.message
             });
         }
-    }
+    },
+
+    findLocation: async (req, res) => {
+        const id = req.params.locationId
+
+        try {
+
+            const url = `https://mybusiness.googleapis.com/v4/location/${id}?key=${GOOGLE_API_KEY}`;
+
+            const response = await axios.get(url);
+
+
+            res.status(200).json(response.data);
+        } catch (error) {
+            console.error('Error fetching location:', error.message);
+            res.status(500).json({ error: 'Unable to fetch location details' });
+        }
+    },
+
+    getKeywords: async (req, res) => {
+
+        const locationId = `locations/${req.params.id}`;
+
+        try {
+            const query = 'SELECT * FROM keywords WHERE location_id = ?';
+            const results = await connection.query(query, [locationId]);
+
+            res.status(200).json(results);
+
+        } catch (error) {
+            console.log('Error');
+
+        }
+    },
+
+    editKeyword: async (req, res) => {
+        const itemId = req.body.id;
+        const editedKeyword = req.body.keyword;
+
+        try {
+
+            const queryCheck = 'SELECT * FROM keywords WHERE id = ?';
+            const [results] = await connection.query(queryCheck, [itemId]);
+
+            if (results.length === 0) {
+                return res.status(404).json({ message: 'Keyword not found.' });
+            }
+
+
+            const queryUpdate = 'UPDATE keywords SET keyword = ? WHERE id = ?';
+            await connection.query(queryUpdate, [editedKeyword, itemId]);
+
+            res.status(200).json({ message: 'Keyword updated successfully.' });
+        } catch (error) {
+            console.error('Error updating keyword:', error);
+            res.status(500).json({ message: 'Failed to update keyword.', error });
+        }
+    },
+
+    deleteKeyword: async (req, res) => {
+        const id = req.params.id;
+
+        try {
+
+            const queryCheck = 'SELECT * FROM keywords WHERE id = ?';
+            const [results] = await connection.query(queryCheck, [id]);
+
+            if (results.length === 0) {
+                return res.status(404).json({ message: 'Keyword not found' });
+            }
+
+
+            const queryDelete = 'DELETE FROM keywords WHERE id = ?';
+            await connection.query(queryDelete, [id]);
+
+            return res.status(200).json({ message: 'Keyword deleted successfully' });
+        } catch (error) {
+            console.error('Error deleting keyword:', error);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+    },
+
+    keywordCount: async (req, res) => {
+        try {
+
+            const query = `
+                SELECT location_id, COUNT(*) as keyword_count 
+                FROM keywords 
+                GROUP BY location_id
+            `;
+            const keywordCounts = await connection.query(query);
+
+
+            res.status(200).json(keywordCounts);
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to fetch keyword counts' });
+        }
+    },
+
+    // fetchmapDetails: async (req, res) => {
+    //     try {
+    //         const { key } = req.body; 
+    //         const googleApiKey = process.env.NEW_PLACE_API; 
+
+    //         if (!googleApiKey) {
+    //             return res.status(500).json({ 
+    //                 error: 'Google API key is not configured' 
+    //             });
+    //         }
+
+    //         const googlePlacesUrl = "https://places.googleapis.com/v1/places:searchText";
+
+    //         const requestBody = {
+    //             textQuery: key,
+    //             maxResultCount: 5 // Optional: Limit number of results
+    //         };
+
+    //         const headers = {
+    //             "Content-Type": "application/json",
+    //             "X-Goog-Api-Key": googleApiKey,
+    //             "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.priceLevel,places.location"
+    //         };
+
+    //         try {
+    //             const response = await axios.post(googlePlacesUrl, requestBody, { 
+    //                 headers,
+    //                 timeout: 10000 // 10 second timeout
+    //             });
+
+    //             // Validate response
+    //             if (!response.data || !response.data.places) {
+    //                 return res.status(404).json({ 
+    //                     error: 'No places found',
+    //                     searchQuery: key 
+    //                 });
+    //             }
+
+    //             res.status(200).json({
+    //                 places: response.data.places,
+    //                 totalResults: response.data.places.length
+    //             });
+    //         } catch (apiError) {
+    //             console.error('Google Places API Error:', {
+    //                 status: apiError.response?.status,
+    //                 data: apiError.response?.data,
+    //                 message: apiError.message
+    //             });
+
+    //             res.status(apiError.response?.status || 500).json({ 
+    //                 error: 'Failed to fetch map details',
+    //                 details: apiError.response?.data || 'Unknown error occurred'
+    //             });
+    //         }
+    //     } catch (error) {
+    //         console.error('Server-side Error:', error.message);
+    //         res.status(500).json({ 
+    //             error: 'Internal server error',
+    //             message: error.message 
+    //         });
+    //     }
+    // }
+
 
 
 
