@@ -36,7 +36,6 @@ app.get('/', (req, res) => {
 
 cron.schedule('*/10 * * * * *', async () => {
     try {
-        
         const [posts] = await connection.query('SELECT * FROM scheduleposts WHERE status = "pending"');
 
 

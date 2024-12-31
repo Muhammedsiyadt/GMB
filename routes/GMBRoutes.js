@@ -59,5 +59,10 @@ router.put('/editKeywords/:currentRecord', GMBController.editKeyword)
 router.delete('/deleteKeywords/:id', GMBController.deleteKeyword) 
 router.get('/get-all-keywords-count', GMBController.keywordCount)
 
+// BULK POSTING
+router.get('/get-allLocations', GMBController.getLocations)
+router.post('/create-bulk-posts', upload.single('avatar'), GMBController.createBulkPost)
+router.post('/create-bulk-aiPosts', upload.single('avatar'), AuthMiddleware, GMBController.createbulkAiPost);
+
 
 module.exports = router;

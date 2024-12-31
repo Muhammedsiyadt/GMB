@@ -678,23 +678,18 @@ const GMBController = {
             const { locationId, lat, lng } = req.body;
             let location = `${lat},${lng}`;
 
-            // Fetch keywords from GMBController
             const keywords = await GMBController.fetchKeywords(locationId);
 
             if (keywords.error) {
                 return res.status(404).json(keywords);
             }
 
-            // Prepare the current date
             const currentDate = new Date();
 
-            // Define the query for updating the location
             const query = 'UPDATE locations SET last_rank_updated = ? WHERE location_id = ?';
 
-            // Execute the update query using the pool
             await connection.query(query, [currentDate, locationId]);
 
-            // Process each keyword
             for (const keyword of keywords) {
                 // console.log(`Updating rank for keyword: ${keyword.keyword}`);
             }
@@ -711,7 +706,6 @@ const GMBController = {
         const query = 'SELECT keywords.id, keywords.keyword, keywords.rank FROM keywords WHERE keywords.location_id = ?';
 
         try {
-            // Execute the query using the promisified connection
             const [results] = await connection.query(query, [locationId]);
 
             if (results.length === 0) {
@@ -838,21 +832,21 @@ const GMBController = {
     },
 
     getlocationData: async (req, res) => {
-        const { locationId } = req.params; 
+        const { locationId } = req.params;
         const gmbAccessToken = req.headers['gmb_access_token'];
-        
+
         if (!locationId) {
             return res.status(400).json({ error: 'Location ID is required' });
         }
         if (!gmbAccessToken) {
             return res.status(401).json({ error: 'Missing Authorization tokens' });
         }
-    
+
         // Object to store the latest location data
         let locationData = {};
-    
+
         const api = `https://mybusinessbusinessinformation.googleapis.com/v1/locations/${locationId}?readMask=title`;
-        
+
         try {
             const response = await axios.get(api, {
                 headers: {
@@ -860,24 +854,24 @@ const GMBController = {
                     'Content-Type': 'application/json',
                 },
             });
-    
+
             // Assuming title is available in response.data.title
             const title = response.data.title;
-    
+
             // Store the current location and name in the object
             locationData = {
                 location: locationId,
                 name: title
             };
-    
+
             res.status(200).json({
                 success: true,
                 data: locationData
             });
-    
+
         } catch (error) {
             console.error('Error fetching location data:', error);
-    
+
             // Handle specific error responses
             if (error.response) {
                 res.status(error.response.status).json({
@@ -1324,71 +1318,262 @@ const GMBController = {
         }
     },
 
-    // fetchmapDetails: async (req, res) => {
-    //     try {
-    //         const { key } = req.body; 
-    //         const googleApiKey = process.env.NEW_PLACE_API; 
+    getLocations: async (req, res) => {
+        try {
+            const [allLocations] = await connection.query('SELECT location_name FROM locations');
+            const gmbAccessToken = req.headers['gmb_access_token'];
 
-    //         if (!googleApiKey) {
-    //             return res.status(500).json({ 
-    //                 error: 'Google API key is not configured' 
-    //             });
-    //         }
+            const locations = {};
 
-    //         const googlePlacesUrl = "https://places.googleapis.com/v1/places:searchText";
+            for (let i = 0; i < allLocations.length; i++) {
+                const location_id = allLocations[i].location_name; // Extract the location_id from the query result
 
-    //         const requestBody = {
-    //             textQuery: key,
-    //             maxResultCount: 5 // Optional: Limit number of results
-    //         };
+                const api = `https://mybusinessbusinessinformation.googleapis.com/v1/${location_id}?readMask=title`;
 
-    //         const headers = {
-    //             "Content-Type": "application/json",
-    //             "X-Goog-Api-Key": googleApiKey,
-    //             "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.priceLevel,places.location"
-    //         };
+                try {
+                    const response = await axios.get(api, {
+                        headers: {
+                            Authorization: `Bearer ${gmbAccessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
 
-    //         try {
-    //             const response = await axios.post(googlePlacesUrl, requestBody, { 
-    //                 headers,
-    //                 timeout: 10000 // 10 second timeout
-    //             });
+                    const name = response.data.title; // Extract the title from the API response
 
-    //             // Validate response
-    //             if (!response.data || !response.data.places) {
-    //                 return res.status(404).json({ 
-    //                     error: 'No places found',
-    //                     searchQuery: key 
-    //                 });
-    //             }
+                    // Push location_id and name into the locations object
+                    locations[location_id] = {
+                        location_id: location_id,
+                        location_name: name,
+                    };
 
-    //             res.status(200).json({
-    //                 places: response.data.places,
-    //                 totalResults: response.data.places.length
-    //             });
-    //         } catch (apiError) {
-    //             console.error('Google Places API Error:', {
-    //                 status: apiError.response?.status,
-    //                 data: apiError.response?.data,
-    //                 message: apiError.message
-    //             });
+                } catch (error) {
+                    console.error(`Failed to fetch data for location_id: ${location_id}`, error.message);
+                }
+            }
+            res.status(200).json(locations);
 
-    //             res.status(apiError.response?.status || 500).json({ 
-    //                 error: 'Failed to fetch map details',
-    //                 details: apiError.response?.data || 'Unknown error occurred'
-    //             });
-    //         }
-    //     } catch (error) {
-    //         console.error('Server-side Error:', error.message);
-    //         res.status(500).json({ 
-    //             error: 'Internal server error',
-    //             message: error.message 
-    //         });
-    //     }
-    // }
+        } catch (error) {
+            console.error('Database Query Error:', error);
+            res.status(500).json({ error: 'Failed to fetch locations' });
+        }
+    },
 
+    createBulkPost: async (req, res) => {
+        const file = req.file;
+        
+        try {
+            const {
+                description,
+                callToAction,
+                account,
+                location,
+                accessToken,
+                phoneNumber,
+                actionLink,
+            } = req.body;
+    
+            // Validation checks
+            if (!file) {
+                return res.status(400).json({ error: 'No image file uploaded' });
+            }
+    
+            const actionButtonConverted = callToAction === "null" ? null : callToAction;
+            const actionLinkConverted = actionLink === "null" ? null : actionLink;
+    
+            // Get the action type from the call to action
+            let actionType = GMBController.getActionType(actionButtonConverted);
+    
+            // Calculate the scheduled time for 2 days in the future
+            const scheduledTime = new Date();
+            scheduledTime.setDate(scheduledTime.getDate() + 2);
+    
+            // Upload image to hosting service
+            const imageUrl = await GMBController.uploadToImgKit(file);
+    
+            // Construct the post data
+            const postBody = {
+                languageCode: "en-US",
+                topicType: "STANDARD",
+                summary: description,
+                media: [
+                    {
+                        mediaFormat: 'PHOTO',
+                        sourceUrl: imageUrl,
+                    },
+                ],
+            };
+    
+            // Add call to action if applicable
+            if (actionButtonConverted && actionLinkConverted) {
+                const callToActionObj = GMBController.createCallToAction(
+                    actionType, 
+                    actionLinkConverted, 
+                    phoneNumber
+                );
+                if (callToActionObj) {
+                    postBody.callToAction = callToActionObj;
+                }
+            }
+    
+            // Make the API request to create a local post in GMB
+            const response = await axios.post(
+                `https://mybusiness.googleapis.com/v4/${account}/${location}/localPosts`,
+                postBody,
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                }
+            );
+    
+            // Send back the response
+            res.status(200).json({
+                message: 'Post created successfully',
+                postId: response.data.id
+            });
+    
+        } catch (error) {
+            console.error('Post Creation Error:', error);
+            res.status(500).json({ 
+                error: 'Failed to create post', 
+                details: error.message 
+            });
+        }
+    },
 
+    createbulkAiPost: async (req, res) => {
+        try {
+            const {
+                account,
+                location,
+                accessToken,
+                posts
+            } = req.body; 
+    
+            // Parse posts from JSON string
+            const parsedPosts = JSON.parse(posts);
+    
+            // Validate posts
+            if (!parsedPosts || !Array.isArray(parsedPosts) || parsedPosts.length === 0) {
+                return res.status(400).json({ error: 'No posts provided' });
+            }
+    
+            if (parsedPosts.length > 4) {
+                return res.status(400).json({ error: 'Maximum 4 posts allowed' });
+            }
+    
+            // Store successful and failed posts
+            const successfulPosts = [];
+            const failedPosts = [];
+    
+            // Process each post sequentially with detailed error handling
+            for (const post of parsedPosts) {
+                try {
+                    // Validate required fields
+                    if (!post.postContent) {
+                        throw new Error('Post content is missing');
+                    }
+    
+                    if (!post.imageUrl) {
+                        throw new Error('No image provided for the post');
+                    }
+    
+                    // Download/validate image
+                    let imageUrl;
+                    try {
+                        imageUrl = await GMBController.downloadAndUploadImage(post.imageUrl);
+                    } catch (imageError) {
+                        throw new Error(`Image upload failed: ${imageError.message}`);
+                    }
+    
+                    // Prepare post body
+                    const postBody = {
+                        languageCode: "en-US",
+                        topicType: "STANDARD",
+                        summary: post.postContent,
+                        media: [
+                            {
+                                mediaFormat: 'PHOTO',
+                                sourceUrl: imageUrl,
+                            },
+                        ],
+                    };
 
+                    
+                    if (post.actionButton && post.actionButton !== 'none') {
+                        try {
+                            const actionType = GMBController.getActionType(post.actionButton);
+                            const callToAction = GMBController.createCallToAction(
+                                actionType, 
+                                post.actionLink, 
+                                post.callPhone
+                            );
+                            
+                            if (callToAction) {
+                                postBody.callToAction = callToAction;
+                            }
+                        } catch (actionError) {
+                            throw new Error(`Call to action creation failed: ${actionError.message}`);
+                        }
+                    }
+    
+                    // Post to Google My Business
+                    try {
+                        const response = await axios.post(
+                            `https://mybusiness.googleapis.com/v4/${account}/${location}/localPosts`,
+                            postBody,
+                            {
+                                headers: {
+                                    Authorization: `Bearer ${accessToken}`,
+                                },
+                            }
+                        );
+    
+                        successfulPosts.push({
+                            postId: response.data.name,
+                            content: post.postContent
+                        });
+                    } catch (postError) {
+                        throw new Error(`GMB post creation failed: ${postError.response?.data?.error?.message || postError.message}`);
+                    }
+    
+                } catch (individualPostError) {
+                    console.error('Error processing individual post:', individualPostError);
+                    failedPosts.push({
+                        content: post.postContent,
+                        error: individualPostError.message
+                    });
+    
+                    // Optional: If you want to stop processing further posts on first error
+                    // break;
+                }
+            }
+    
+            const responseBody = {
+                successCount: successfulPosts.length,
+                failedCount: failedPosts.length,
+                successfulPosts,
+                failedPosts
+            };
+    
+            if (failedPosts.length === parsedPosts.length) {
+                return res.status(500).json(responseBody);
+            } else if (failedPosts.length > 0) {
+                return res.status(206).json(responseBody); // Partial success
+            } else {
+                return res.status(200).json(responseBody);
+            }
+    
+        } catch (overallError) {
+            console.error('Unexpected error in bulk post creation:', overallError);
+            return res.status(500).json({
+                error: 'Unexpected error occurred during bulk post creation',
+                details: overallError.message
+            });
+        }
+    },
+    
+    
 
 }
 
