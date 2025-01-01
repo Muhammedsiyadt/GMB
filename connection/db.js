@@ -12,4 +12,4 @@ const connection = mysql.createPool({
   queueLimit: 0
 }).promise();
 
-module.exports = connection;
+module.exports = connection; 
