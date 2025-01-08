@@ -43,11 +43,17 @@ app.use(morgan('dev', {
 cron.schedule('*/10 * * * * *', async () => {
     try {
         const [posts] = await connection.query('SELECT * FROM scheduleposts WHERE status = "pending"');
+        if (posts.length === 0) {
+            console.log('No pending posts found.');
+        } else {
+            console.log(`Found ${posts.length} pending post(s).`);
+        }
+
         for (const post of posts) {
             const { id, publicationDate, account, location_id, postContent, accessToken, imageUrl } = post;
-            
+
             const currentDate = new Date();
-            
+
             if (currentDate >= new Date(publicationDate)) {
                 const postBody = {
                     languageCode: "en-US",
@@ -58,34 +64,36 @@ cron.schedule('*/10 * * * * *', async () => {
                             mediaFormat: 'PHOTO',
                             sourceUrl: post.imageUrl,
                         },
-                    ], 
-                };  
+                    ],
+                };
 
                 try {
                     const response = await axios.post(
                         `https://mybusiness.googleapis.com/v4/${account}/${location_id}/localPosts`,
                         postBody,
                         {
-                            headers: { 
+                            headers: {
                                 Authorization: `Bearer ${accessToken}`,
                             },
                         }
-                    ); 
+                    );
+                    console.log('Post ID', id, 'posted successfully');
                     await connection.query(
                         'UPDATE scheduleposts SET status = ? WHERE id = ?',
                         ['posted', id]
-                    ); 
-
-                    console.log(`Post ID ${id} posted successfully at ${new Date().toISOString()}`);
+                    );
                 } catch (error) {
-                    console.log('Cron error in index.js');
+                    console.log('Error posting to API for Post ID', id, error.message);
                 }
+            } else {
+                console.log(`Post ID ${id} not yet ready for publication.`);
             }
         }
     } catch (error) {
-        console.log('Cron error in index.js');
+        console.log('Cron job error:', error.message);
     }
 });
+
 
 app.listen(process.env.PORT || 5000, (error) => {
     if (error) {
