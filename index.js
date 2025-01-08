@@ -1,7 +1,8 @@
 require("dotenv").config();
 const express = require('express');
-const cron = require('node-cron');  // Import node-cron for scheduling
+const cron = require('node-cron');
 const axios = require('axios');
+const morgan = require('morgan');  // Import morgan for logging
 const app = express();
 const cors = require('cors');
 const connection = require('./connection/db');
@@ -17,7 +18,8 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
+// Use morgan for logging requests in 'dev' format
+app.use(morgan('dev')); 
 
 app.use('/api', AuthRoutes);
 app.use('/api/gmb', GMBRoutes);
@@ -33,18 +35,18 @@ app.get('/', (req, res) => {
     res.json(serverInfo);
 });
 
+app.use(morgan('dev', {
+    skip: (req, res) => req.method !== 'GET'  // Only log GET requests
+}));
+
 
 cron.schedule('*/10 * * * * *', async () => {
     try {
         const [posts] = await connection.query('SELECT * FROM scheduleposts WHERE status = "pending"');
-
-
-
         for (const post of posts) {
-            const { id, publicationDate, account, location_id, postContent, accessToken , imageUrl} = post;
+            const { id, publicationDate, account, location_id, postContent, accessToken, imageUrl } = post;
             
             const currentDate = new Date();
-
             
             if (currentDate >= new Date(publicationDate)) {
                 const postBody = {
@@ -58,11 +60,9 @@ cron.schedule('*/10 * * * * *', async () => {
                         },
                     ], 
                 };  
-                 
-  
-                 
+
                 try {
-                    const response = await axios.post(  
+                    const response = await axios.post(
                         `https://mybusiness.googleapis.com/v4/${account}/${location_id}/localPosts`,
                         postBody,
                         {
@@ -78,16 +78,12 @@ cron.schedule('*/10 * * * * *', async () => {
 
                     console.log(`Post ID ${id} posted successfully at ${new Date().toISOString()}`);
                 } catch (error) {
-                    // console.error(`Error posting ID ${id}:`, error);
-                    console.log('Crone error in index.js');
-                    
+                    console.log('Cron error in index.js');
                 }
             }
         }
     } catch (error) {
-        // console.error('Error fetching scheduled posts:', error);
-        console.log('Crone error in index.js'); 
-
+        console.log('Cron error in index.js');
     }
 });
 
