@@ -12,10 +12,7 @@ const multer = require('multer');
 const upload = multer();
 const bodyParser = require('body-parser');
 
-app.use(cors({
-    origin: 'https://xenproductions.co.in',
-    credentials: true,
-}));
+app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' })); 
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.json());
