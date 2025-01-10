@@ -12,7 +12,10 @@ const multer = require('multer');
 const upload = multer();
 const bodyParser = require('body-parser');
 
-app.use(cors());
+app.use(cors({
+    origin: 'https://xenproductions.co.in',
+    credentials: true,
+}));
 app.use(bodyParser.json({ limit: '50mb' })); 
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.json());
@@ -43,11 +46,11 @@ app.use(morgan('dev', {
 cron.schedule('*/10 * * * * *', async () => {
     try {
         const [posts] = await connection.query('SELECT * FROM scheduleposts WHERE status = "pending"');
-        if (posts.length === 0) {
-            console.log('No pending posts found.');
-        } else {
-            console.log(`Found ${posts.length} pending post(s).`);
-        }
+        // if (posts.length === 0) {
+        //     console.log('No pending posts found.');
+        // } else {
+        //     console.log(`Found ${posts.length} pending post(s).`);
+        // }
 
         for (const post of posts) {
             const { id, publicationDate, account, location_id, postContent, accessToken, imageUrl } = post;
@@ -86,7 +89,7 @@ cron.schedule('*/10 * * * * *', async () => {
                     console.log('Error posting to API for Post ID', id, error.message);
                 }
             } else {
-                console.log(`Post ID ${id} not yet ready for publication.`);
+                // console.log(`Post ID ${id} not yet ready for publication.`);
             }
         }
     } catch (error) {
