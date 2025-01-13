@@ -343,6 +343,8 @@ const AuthController = {
             // Make a request to the Google Places Details API
             const response = await axios.get(placeDetailsUrl);
 
+            console.log(response)
+
             // Check for successful response
             if (response.data.status !== 'OK') {
                 return res.status(400).json({

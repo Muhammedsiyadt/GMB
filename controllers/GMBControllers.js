@@ -1303,20 +1303,20 @@ const GMBController = {
 
     keywordCount: async (req, res) => {
         try {
-
             const query = `
                 SELECT location_id, COUNT(*) as keyword_count 
                 FROM keywords 
                 GROUP BY location_id
             `;
-            const keywordCounts = await connection.query(query);
-
-
-            res.status(200).json(keywordCounts);
+            const [rows] = await connection.query(query); // Destructure rows from the result
+    
+            res.status(200).json(rows); // Ensure rows are sent, not the entire result set
         } catch (error) {
+            console.error('Error fetching keyword counts:', error);
             res.status(500).json({ error: 'Failed to fetch keyword counts' });
         }
-    },
+    }
+    ,
 
     getLocations: async (req, res) => {
         try {
